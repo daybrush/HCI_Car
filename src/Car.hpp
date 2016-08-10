@@ -15,6 +15,6 @@ public:
     vector<ofPoint> position;
     bool is_init;
     bool is_reverse;
-    bool is_stop;
+    bool is_stop = true;
     int direction = 0;
 };

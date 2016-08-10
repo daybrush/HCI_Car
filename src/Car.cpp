@@ -38,8 +38,8 @@ void Car::add() {
     double c = cos(-angle * PI / 180);
     double  s = sin(-angle * PI / 180);
     
-    double x = -s * this->speed / 50;
-    double y = c * this->speed / 50;
+    double x = -s * this->speed / 200;
+    double y = c * this->speed / 200;
     if(this->is_reverse)
         y *= -1;
     position.push_back(ofPoint(x, y, 0));

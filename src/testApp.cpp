@@ -14,8 +14,8 @@ void testApp::setup(){
 	// (ie, COM4 on a pc, /dev/tty.... on linux, /dev/tty... on a mac)
 	// arduino users check in arduino app....
 	int baud = 9600;
-//	serial.setup("/dev/cu.HC-06-DevB", baud); //open the first device
-    serial.setup("/dev/cu.usbmodem1411", baud);
+	serial.setup("/dev/cu.HC-06-DevB", baud); //open the first device
+//    serial.setup("/dev/cu.usbmodem1411", baud);
     
 	//serial.setup("COM4", baud); // windows example
 	//serial.setup("/dev/tty.usbserial-A4001JEC", baud); // mac osx example
@@ -170,6 +170,7 @@ void testApp::keyPressed(int key){
         }
         return;
     }
+    cout << key << endl;
     if(key == 357) {
         //forward
         if(myCar.direction != 0 || myCar.is_reverse || myCar.is_stop) {
