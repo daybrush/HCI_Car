@@ -1,29 +1,35 @@
-#pragma once
+#ifndef _TEST_APP
+#define _TEST_APP
 
+#include "ofxOpenNI.h"
 #include "ofMain.h"
-#include "Car.hpp"
+
+#define MAX_DEVICES 2
+
 class testApp : public ofBaseApp{
 
-	public:
-		void setup();
-		void update();
-		void draw();
+public:
+    
+	void setup();
+	void update();
+	void draw();
+    void exit();
+    
+	void keyPressed  (int key);
+	void keyReleased(int key);
+	void mouseMoved(int x, int y );
+	void mouseDragged(int x, int y, int button);
+	void mousePressed(int x, int y, int button);
+	void mouseReleased(int x, int y, int button);
+	void windowResized(int w, int h);
 
-		void keyPressed(int key);
-		void keyReleased(int key);
-		void mouseMoved(int x, int y );
-		void mouseDragged(int x, int y, int button);
-		void mousePressed(int x, int y, int button);
-		void mouseReleased(int x, int y, int button);
-		void windowResized(int w, int h);
-		void dragEvent(ofDragInfo dragInfo);
-		void gotMessage(ofMessage msg);
-        void send(string text);
-		ofTrueTypeFont		font; // for displaying messages on window
-        Car myCar;
-		string recvData;
-		float  rotationValue;
-        bool is_start = false;
-		ofSerial serial; //serial communication
-    ofImage image;
+    int numDevices;
+	ofxOpenNI openNIDevices[MAX_DEVICES];
+    
+    ofTrueTypeFont verdana;
+    
+    void userEvent(ofxOpenNIUserEvent & event);
+    
 };
+
+#endif

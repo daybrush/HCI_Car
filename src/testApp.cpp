@@ -1,232 +1,160 @@
 #include "testApp.h"
 
 //--------------------------------------------------------------
-void testApp::setup(){
-	ofSetVerticalSync(true);
-	
-	ofBackground(255);	
-	font.loadFont("DIN.otf", 14);
-	
-	serial.listDevices();
-	vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
-	
-	// this should be set to whatever com port your serial device is connected to.
-	// (ie, COM4 on a pc, /dev/tty.... on linux, /dev/tty... on a mac)
-	// arduino users check in arduino app....
-	int baud = 9600;
-	serial.setup("/dev/cu.HC-06-DevB", baud); //open the first device
-//    serial.setup("/dev/cu.usbmodem1411", baud);
+void testApp::setup() {
     
-	//serial.setup("COM4", baud); // windows example
-	//serial.setup("/dev/tty.usbserial-A4001JEC", baud); // mac osx example
-	//serial.setup("/dev/ttyUSB0", baud); //linux example
-
-    recvData.clear();
-    myCar.setup();
+    ofSetLogLevel(OF_LOG_NOTICE);
     
+    numDevices = openNIDevices[0].getNumDevices();
     
-    image.loadImage("location.png");
-    image.resize(50, 50);
+    for (int deviceID = 0; deviceID < numDevices; deviceID++){
+        //openNIDevices[deviceID].setLogLevel(OF_LOG_VERBOSE); // ofxOpenNI defaults to ofLogLevel, but you can force to any level
+        openNIDevices[deviceID].setup();
+        openNIDevices[deviceID].addDepthGenerator();
+        openNIDevices[deviceID].addImageGenerator();
+        openNIDevices[deviceID].addUserGenerator();
+        openNIDevices[deviceID].setRegister(true);
+        openNIDevices[deviceID].setMirror(true);
+		openNIDevices[deviceID].start();
+    }
+    
+    // NB: Only one device can have a user generator at a time - this is a known bug in NITE due to a singleton issue
+    // so it's safe to assume that the fist device to ask (ie., deviceID == 0) will have the user generator...
+    
+    openNIDevices[0].setMaxNumUsers(1); // defualt is 4
+    ofAddListener(openNIDevices[0].userEvent, this, &testApp::userEvent);
+    
+    ofxOpenNIUser user;
+    user.setUseMaskTexture(true);
+    user.setUsePointCloud(true);
+    user.setPointCloudDrawSize(2); // this is the size of the glPoint that will be drawn for the point cloud
+    user.setPointCloudResolution(2); // this is the step size between points for the cloud -> eg., this sets it to every second point
+    openNIDevices[0].setBaseUserClass(user); // this becomes the base class on which tracked users are created
+                                             // allows you to set all tracked user properties to the same type easily
+                                             // and allows you to create your own user class that inherits from ofxOpenNIUser
+    
+    // if you want to get fine grain control over each possible tracked user for some reason you can iterate
+    // through users like I'm doing below. Please not the use of nID = 1 AND nID <= openNIDevices[0].getMaxNumUsers()
+    // as what you're doing here is retrieving a user that is being stored in a std::map using it's XnUserID as the key
+    // that means it's not a 0 based vector, but instead starts at 1 and goes upto, and includes maxNumUsers...
+//    for (XnUserID nID = 1; nID <= openNIDevices[0].getMaxNumUsers(); nID++){
+//        ofxOpenNIUser & user = openNIDevices[0].getUser(nID);
+//        user.setUseMaskTexture(true);
+//        user.setUsePointCloud(true);
+//        //user.setUseAutoCalibration(false); // defualts to true; set to false to force pose detection
+//        //user.setLimbDetectionConfidence(0.9f); // defaults 0.3f
+//        user.setPointCloudDrawSize(2);
+//        user.setPointCloudResolution(1);
+//    }
+    verdana.loadFont(ofToDataPath("verdana.ttf"), 24);
 }
 
 //--------------------------------------------------------------
-
-int sendSpeed = 0;
-bool is_str_start = 0;
 void testApp::update(){
-	char ch;
-    
-
-    recvData.clear();
-    is_str_start = false;
-	if (serial.available()) {
-		while((ch = serial.readByte())>0) {
-            // angle #
-            //   speed @ angle/ = 255/100/
-            //init
-            if(ch == '$') {
-                is_str_start = true;
-                recvData.clear();
-                continue;
-            } else if(is_str_start) {
-                if (ch == '#') {
-                    cout << "initAngle";
-                    myCar.init(ofToFloat(recvData));
-                    
-                    is_start = true;
-                }
-                else if(ch == '/') {
-                    cout << "setAngle";
-                    if(myCar.is_init) {
-                        myCar.setAngle(ofToFloat(recvData));
-                    }
-                }
-                else if (ch == '@') {
-                    cout << "setSpeed";
-                    //myCar.speed = ofToFloat(recvData);
-                } else if(ch == '*') {
-                    cout << "print";
-                } 
-                else {
-                    recvData += ch;
-                    continue;
-                }
-                cout << recvData << endl;
-                
-                recvData.clear();
-            }
-           
-		}
-	}
-    
-    myCar.add();
+    ofBackground(0, 0, 0);
+    for (int deviceID = 0; deviceID < numDevices; deviceID++){
+        openNIDevices[deviceID].update();
+    }
 }
 
 //--------------------------------------------------------------
 void testApp::draw(){
-    if(!serial.isInitialized())
-        return;
+	ofSetColor(255, 255, 255);
     
-	ofBackground(20,20,20);
-	ofSetColor(220);
-    int radius = 120;
-    int margin = 20;
-    int border = 10;
-    int angle = 0;
+    ofPushMatrix();
     
-    
-    ofPushView();
-        ofTranslate(ofGetWindowWidth() / 2, ofGetWindowHeight() / 2);
-        myCar.drawPosition();
-        ofPushView();
-            ofRotate(myCar.angle - myCar.initAngle);
-            image.draw(-25, -25);
-        ofPopView();
-    ofPopView();
-    
-    
-    
-    
-    ofPushView();
-        ofTranslate(radius + margin, ofGetWindowHeight() -(radius + margin) );
-        ofPushStyle();
-            ofSetColor(255, 255, 255);
-            ofDrawCircle(0, 0, radius);
-        ofPopStyle();
-        ofPushStyle();
-            ofSetColor(0, 0, 0);
-            ofDrawCircle(0, 0, radius - border);
-        ofPopStyle();
-    
-    
-    
-        ofPushStyle();
-            ofSetColor(255, 255, 255);
-            ofDrawCircle(0,0, 7);
-        ofPopStyle();
-        for(int i = 0; i < 30; ++i) {
-            ofPushView();
-                ofRotate(-90 + 60 + i * 240 / 30);
-                ofTranslate(-radius +border, 0);
-            ofDrawRectangle(0, 0, i%5==0? 15 : 10, i%5==0? 4 : 3);
-            ofPopView();
-        }
-        ofPushView();
-            ofSetColor(255, 255, 255);
-            ofTranslate(-6, 5);
-            int tr =(radius - margin - 20);
-            for(int i = 0; i <= 6; ++i) {
-                double ang = (150 + i * (240 / 6)) * PI / 180;
-                
-                font.drawString(ofToString(i), cos(ang) * tr, sin(ang) * tr);
-            }
-        ofPopView();
-        ofPushView();
-        ofPushStyle();
-            ofSetColor(255, 255, 255);
-            ofTranslate(0 , 0);
-            ofRotate(60 + myCar.speed / 10);
-            ofDrawTriangle(-4, 0, 0, radius * 0.7, 4, 0);
-        ofPopStyle();
-        ofPopView();
-    
-    ofPopView();
+    for (int deviceID = 0; deviceID < numDevices; deviceID++){
+        ofTranslate(0, deviceID * 480);
+        openNIDevices[deviceID].drawDebug(); // debug draw does the equicalent of the commented methods below
+//        openNIDevices[deviceID].drawDepth(0, 0, 640, 480);
+//        openNIDevices[deviceID].drawImage(640, 0, 640, 480);
+//        openNIDevices[deviceID].drawSkeletons(640, 0, 640, 480);
+        
+    }
 
-
+    // do some drawing of user clouds and masks
+    ofPushMatrix();
+    ofEnableBlendMode(OF_BLENDMODE_ALPHA);
+    int numUsers = openNIDevices[0].getNumTrackedUsers();
+    for (int nID = 0; nID < numUsers; nID++){
+        ofxOpenNIUser & user = openNIDevices[0].getTrackedUser(nID);
+        user.drawMask();
+        ofPushMatrix();
+        ofTranslate(320, 240, -1000);
+        user.drawPointCloud();
+        ofPopMatrix();
+    }
+    ofDisableBlendMode();
+    ofPopMatrix();
+    
+	ofSetColor(0, 255, 0);
+	string msg = " MILLIS: " + ofToString(ofGetElapsedTimeMillis()) + " FPS: " + ofToString(ofGetFrameRate());
+	verdana.drawString(msg, 20, numDevices * 480 + 26);
 }
 
 //--------------------------------------------------------------
-void testApp::send(string text) {
-    unsigned char cstr[10];
-    //strncpy((char *)cstr,text.c_str(), text.size());
-    serial.writeBytes((unsigned char *)text.c_str(), text.size());
+void testApp::userEvent(ofxOpenNIUserEvent & event){
+    ofLogNotice() << getUserStatusAsString(event.userStatus) << "for user" << event.id << "from device" << event.deviceID;
 }
+
+//--------------------------------------------------------------
+void testApp::exit(){
+    // this often does not work -> it's a known bug -> but calling it on a key press or anywhere that isnt std::aexit() works
+    // press 'x' to shutdown cleanly...
+    for (int deviceID = 0; deviceID < numDevices; deviceID++){
+        openNIDevices[deviceID].stop();
+    }
+}
+
+//--------------------------------------------------------------
 void testApp::keyPressed(int key){
-    if(!is_start) {
-        if(key == 32) {
-            cout << "press init"<<endl;
-            
-            send("init#");
-        }
-        return;
+    int cloudRes = -1;
+    switch (key) {
+        case '1':
+            cloudRes = 1;
+            break;
+        case '2':
+            cloudRes = 2;
+            break;
+        case '3':
+            cloudRes = 3;
+            break;
+        case '4':
+            cloudRes = 4;
+            break;
+        case '5':
+            cloudRes = 5;
+            break;
+        case 'x':
+            for (int deviceID = 0; deviceID < numDevices; deviceID++){
+                openNIDevices[deviceID].stop();
+            }
+            break;
+        case 'i':
+            for (int deviceID = 0; deviceID < numDevices; deviceID++){
+                if (openNIDevices[deviceID].isImageOn()){
+                    openNIDevices[deviceID].removeImageGenerator();
+                    openNIDevices[deviceID].addInfraGenerator();
+                    continue;
+                }
+                if (openNIDevices[deviceID].isInfraOn()){
+                    openNIDevices[deviceID].removeInfraGenerator();
+                    openNIDevices[deviceID].addImageGenerator();
+                    continue;
+                }
+            }
+            break;
+        case 'b':
+            for (int deviceID = 0; deviceID < numDevices; deviceID++){
+                openNIDevices[deviceID].setUseBackBuffer(!openNIDevices[deviceID].getUseBackBuffer());
+            }
+            break;
+        default:
+            break;
     }
-    cout << key << endl;
-    if(key == 357) {
-        //forward
-        if(myCar.direction != 0 || myCar.is_reverse || myCar.is_stop) {
-            myCar.is_reverse = false;
-            myCar.direction = 0;
-            myCar.is_stop = false;
-            send("2/");
-        }
-        
-    } else if(key == 356) {
-        if(myCar.direction != -1 || myCar.is_stop) {
-            send("4/");
-            myCar.direction = -1;
-            myCar.is_stop = false;
-        }
-    } else if(key == 358) {
-        if(myCar.direction != 1 || myCar.is_stop) {
-            //right
-            send("6/");
-            myCar.direction = 1;
-            myCar.is_stop =false;
-        }
-    } else if(key == 359) {
-        if(myCar.direction != 0 || !myCar.is_reverse || myCar.is_stop) {
-        //back
-            send("8/");
-            myCar.direction = 0;
-            myCar.is_stop =false;
-            myCar.is_reverse = true;
-        }
-    } else if(key == 's' || key == 'S') {
-        if(!myCar.is_stop) {
-          //stop
-            send("5/");
-            myCar.direction = 0;
-            myCar.speed = 0;
-            myCar.is_stop = true;
-        }
-    } else if(key == 32) {
-        myCar.speed += 100;
-        if(myCar.speed >= 2400)
-            myCar.speed = 2400;
-        
-        
-        send(ofToString(myCar.speed) + "@");
-        
-    } else if(key == 'b' || key == 'B') {
-        myCar.speed -= 100;
-        if(myCar.speed <= 0)
-            myCar.speed = 00;
-        
-        
-        send(ofToString(myCar.speed) + "@");
-    } else if (key =='i' || key == 'I') {
-        send("init#");
-    }
+    for (int deviceID = 0; deviceID < numDevices; deviceID++){
+		openNIDevices[deviceID].setPointCloudResolutionAllUsers(cloudRes);
+	}
 }
 
 //--------------------------------------------------------------
@@ -259,12 +187,3 @@ void testApp::windowResized(int w, int h){
 
 }
 
-//--------------------------------------------------------------
-void testApp::gotMessage(ofMessage msg){
-
-}
-
-//--------------------------------------------------------------
-void testApp::dragEvent(ofDragInfo dragInfo){ 
-
-}
