@@ -65,6 +65,7 @@ Quaternion q;           // [w, x, y, z]         quaternion container
 MPU6050 mpu;
 
 
+int angle_level = 1;
 
 void controllerByIRCommand(String& szIRCmd)
 {
@@ -87,18 +88,6 @@ void controllerByIRCommand(String& szIRCmd)
     g_carDirection = CAR_DIR_BK;
     Serial.println("$Backward*");
     is_back = true;
-  }
-  else
-  if (szIRCmd == "4")
-  {
-    g_carDirection = CAR_DIR_LF;
-    Serial.println("$Left*");
-  }
-  else
-  if (szIRCmd == "6")
-  {
-    g_carDirection = CAR_DIR_RF;
-    Serial.println("$Right*");
   }
 }
 
@@ -160,7 +149,7 @@ void car_left()
 {
   digitalWrite(EN1, is_back? LOW : HIGH);
   digitalWrite(EN2, is_back?HIGH : LOW);
-  analogWrite(ENA, 0);
+  analogWrite(ENA, g_carSpeed / angle_level);
 
   digitalWrite(EN3, is_back?LOW : HIGH);
   digitalWrite(EN4,  is_back?HIGH : LOW);
@@ -176,10 +165,21 @@ void car_right()
 
   digitalWrite(EN3, is_back?LOW : HIGH);
   digitalWrite(EN4,  is_back?HIGH : LOW);
-  analogWrite(ENB, 0);
+  analogWrite(ENB, g_carSpeed / angle_level);
 }
 
+void car_go() {
+  is_back = g_carSpeed < 0;
+  int left_speed = abs(angle_level > 0 ? g_carSpeed :  g_carSpeed / abs(angle_level));
+  int right_speed = abs(angle_level > 0 ? g_carSpeed / angle_level : g_carSpeed);
+  digitalWrite(EN1, is_back?LOW : HIGH);
+  digitalWrite(EN2,  is_back?HIGH : LOW);
+  analogWrite(ENA, left_speed);
 
+  digitalWrite(EN3, is_back?LOW : HIGH);
+  digitalWrite(EN4,  is_back?HIGH : LOW);
+  analogWrite(ENB, right_speed);
+}
 //
 //
 void car_stop()
@@ -196,30 +196,7 @@ void car_update()
   // %%
   // 현재는 매번 loop 에서 호출되지만 차후에 커맨드가 있을 경우만 호출될 수 있도록
   // 변경해야 합니다.
-  if (g_carDirection == CAR_DIR_FW)  // 전진
-  {
-    car_forward();
-  }
-  else
-  if (g_carDirection == CAR_DIR_BK) // 후진.
-  {
-    car_backward();
-  }
-  else
-  if (g_carDirection == CAR_DIR_LF) // 좌회전
-  {
-    car_left();
-  }
-  else
-  if (g_carDirection == CAR_DIR_RF) // 우회전
-  {
-    car_right();
-  }
-  else
-  if (g_carDirection == CAR_DIR_ST) // 정지.
-  {
-    car_stop();
-  }
+  car_go();
 }
 
 void print_car_info()
@@ -248,7 +225,7 @@ void readString() {
   char s;    
   while(Serial.available()) {
       s = (char)Serial.read();
-     if(s == '@' || s == '/' || s== '#')
+     if(s == '@' || s == '/' || s== '#' || s== '%')
       isEnd = true;
      else
       str_buf += s;
@@ -264,8 +241,11 @@ void readString() {
       //8 back
       setDirection(str_buf);
      } else if( s== '#') {
+      setCarSpeed("0");
       Serial.print("$" + String(prevAngle) + "#");
       Serial.flush();
+     }else if( s== '%') {
+      angle_level = str_buf.toInt();
      }
     str_buf = "";
   }
@@ -347,7 +327,9 @@ void mpu_print() {
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         //Serial.print("quat\t");
         int sign = q.w/abs(q.w);
-        int angle = -int(sign * q.z * 180);
+        int angle = -int(sign * q.z * 180) / 10;
+        angle *= 10;
+        
         if(prevAngle != angle) {
           if(abs(abs(prevAngle) - abs(angle)) > 20) {
             mpu.resetFIFO();
@@ -371,7 +353,7 @@ void setup()
     #endif
   Serial.begin(9600);
   
-  mpu_setup();
+  //mpu_setup();
   init_car_controller_board();
 
   //print_car_info();
@@ -382,7 +364,7 @@ void setup()
 void loop()
 {
   car_update();
-  mpu_print();
+ // mpu_print();
   readString();
 //  update_IRreceiverModule();
   
