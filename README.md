@@ -8,3 +8,6 @@ Gesture
 
 오른손이 머리를 기준으로 뒤에 있으면 정지
 
+## Libraries
+
+https://github.com/jrowberg/i2cdevlib
